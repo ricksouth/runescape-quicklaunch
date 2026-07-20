@@ -1,4 +1,4 @@
-# runescape-quicklaunch
+# Runescape Quick Launch
 
 <img src="icon.png" width="96" align="right">
 
@@ -9,6 +9,8 @@ Since Jagex accounts arrived, the game has to start through the Jagex Launcher. 
 This does that part for you. It starts the launcher hidden with its own `--launch` and `--silent` flags, waits for the client to appear, closes the launcher, and tags the game window so it groups under your pinned shortcut. One taskbar icon, game on screen, launcher never shown.
 
 It never reads or writes your password or tokens. The official launcher handles login, same as clicking Play yourself.
+
+<img src="/.github/social-preview.png">
 
 ## Install
 
