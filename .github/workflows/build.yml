@@ -1,0 +1,22 @@
+# Compile check only. There are no releases to build here on purpose, the
+# installer compiles from source on the user's machine. This just keeps PRs
+# from breaking that compile.
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile with the in-box csc
+        shell: pwsh
+        run: |
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          & $csc /nologo /target:winexe /out:QuickLaunch.exe /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll src\QuickLaunch.cs src\Tray.cs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $csc /nologo /target:exe /out:MakeShortcut.exe src\MakeShortcut.cs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
