@@ -60,6 +60,13 @@ class QuickLaunch {
 			return Tray.Run();
 
 		if (args.Length == 2 && args[0] == "--remember") {
+			string game = ConfiguredGame();
+			string existing = NameForId(game, SelectedAccountId(game));
+			if (existing != null) {
+				MessageBoxW(IntPtr.Zero,
+					"The selected character is already saved as '" + existing + "'.", Title, 0x40);
+				return 0;
+			}
 			string error = SaveCharacter(args[1], true);
 			if (error != null) {
 				MessageBoxW(IntPtr.Zero, error, Title, 0x10);
@@ -173,35 +180,59 @@ class QuickLaunch {
 		File.WriteAllText(ConfigFile, "game=" + game + "\r\n");
 	}
 
-	// Characters are the ids the launcher stores in "lastGameAccountByGameId",
-	// saved as name=game=id lines in characters.txt.
+	// Characters map a name to the id the launcher stores in
+	// "lastGameAccountByGameId", saved as name=game=id lines in characters.txt.
+	// Older name=id lines are read as osrs.
 
 	static string CharactersFile { get { return Path.Combine(ExeDir, "characters.txt"); } }
 
-	public static string[] SavedCharacterNames(string game) {
-		var names = new List<string>();
+	static List<string[]> ReadCharacters() {
+		var list = new List<string[]>();
 		if (File.Exists(CharactersFile)) {
 			foreach (string line in File.ReadAllLines(CharactersFile)) {
-				string[] parts = line.Split('=');
-				if (parts.Length >= 2 && (parts.Length == 2 ? "osrs" : parts[1]) == game)
-					names.Add(parts[0]);
+				string[] p = line.Split('=');
+				if (p.Length == 2)
+					list.Add(new[] { p[0], "osrs", p[1] });
+				else if (p.Length >= 3)
+					list.Add(new[] { p[0], p[1], p[2] });
 			}
+		}
+		return list;
+	}
+
+	public static string[] SavedCharacterNames(string game) {
+		var names = new List<string>();
+		foreach (var c in ReadCharacters()) {
+			if (c[1] == game)
+				names.Add(c[0]);
 		}
 		names.Sort(StringComparer.OrdinalIgnoreCase);
 		return names.ToArray();
 	}
 
 	static string FindSavedCharacterId(string game, string name) {
-		if (!File.Exists(CharactersFile))
+		foreach (var c in ReadCharacters()) {
+			if (c[1] == game && c[0].Equals(name, StringComparison.OrdinalIgnoreCase))
+				return c[2];
+		}
+		return null;
+	}
+
+	public static string SelectedAccountId(string game) {
+		string settings = ReadSettings();
+		if (settings == null)
 			return null;
-		foreach (string line in File.ReadAllLines(CharactersFile)) {
-			string[] parts = line.Split('=');
-			if (parts.Length < 2 || !parts[0].Equals(name, StringComparison.OrdinalIgnoreCase))
-				continue;
-			if (parts.Length == 2)
-				return game == "osrs" ? parts[1] : null;
-			if (parts[1] == game)
-				return parts[2];
+		Match match = Regex.Match(settings,
+			"\"lastGameAccountByGameId\"\\s*:\\s*\\{[^}]*\"" + game + "\"\\s*:\\s*\"([^\"]+)\"");
+		return match.Success ? match.Groups[1].Value : null;
+	}
+
+	public static string NameForId(string game, string id) {
+		if (id == null)
+			return null;
+		foreach (var c in ReadCharacters()) {
+			if (c[1] == game && c[2] == id)
+				return c[0];
 		}
 		return null;
 	}
@@ -211,13 +242,10 @@ class QuickLaunch {
 			return "Character names can't contain '='.";
 
 		string game = ConfiguredGame();
-		string settings = ReadSettings();
-		Match match = settings == null ? Match.Empty :
-			Regex.Match(settings, "\"lastGameAccountByGameId\"\\s*:\\s*\\{[^}]*\"" + game + "\"\\s*:\\s*\"([^\"]+)\"");
-		if (!match.Success)
+		string id = SelectedAccountId(game);
+		if (id == null)
 			return "Couldn't find a selected character in the launcher settings.\n" +
 				"Open the Jagex Launcher, pick the character, close the launcher, then try again.";
-		string id = match.Groups[1].Value;
 
 		var lines = File.Exists(CharactersFile)
 			? new List<string>(File.ReadAllLines(CharactersFile))

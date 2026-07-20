@@ -107,7 +107,7 @@ class Tray {
 		if (anyClient)
 			menu.Items.Add(clientMenu);
 
-		var remember = new ToolStripMenuItem("Remember current character...");
+		var remember = new ToolStripMenuItem("Remember current character");
 		remember.Click += delegate { RememberViaDialog(); };
 		menu.Items.Add(remember);
 
@@ -136,9 +136,25 @@ class Tray {
 	}
 
 	static void RememberViaDialog() {
+		string game = QuickLaunch.ConfiguredGame();
+		string id = QuickLaunch.SelectedAccountId(game);
+		if (id == null) {
+			MessageBox.Show(
+				"The Jagex Launcher doesn't have a character selected yet.\n\n" +
+				"Open the launcher, pick the character you want, close it, then try again.",
+				QuickLaunch.Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+			return;
+		}
+		string existing = QuickLaunch.NameForId(game, id);
+		if (existing != null) {
+			MessageBox.Show(
+				"The character the launcher currently has selected is already in your list, saved as \"" + existing + "\".",
+				QuickLaunch.Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+			return;
+		}
 		string name = Prompt(
-			"Name for the character the launcher currently has selected.\n" +
-			"(Pick it in the launcher first and close the launcher.)");
+			"The Jagex Launcher currently has a character selected (Jagex id " + id + ").\r\n\r\n" +
+			"Give it a name to add a one-click “Play as” entry here and a desktop shortcut for it.");
 		if (string.IsNullOrEmpty(name))
 			return;
 		string error = QuickLaunch.SaveCharacter(name, true);
@@ -157,25 +173,25 @@ class Tray {
 			form.StartPosition = FormStartPosition.CenterScreen;
 			form.MinimizeBox = false;
 			form.MaximizeBox = false;
-			form.ClientSize = new Size(360, 110);
+			form.ClientSize = new Size(384, 156);
 			form.TopMost = true;
 
 			var text = new Label();
 			text.Text = label;
-			text.SetBounds(12, 10, 336, 45);
+			text.SetBounds(14, 12, 356, 76);
 
 			var input = new TextBox();
-			input.SetBounds(12, 55, 336, 22);
+			input.SetBounds(14, 94, 356, 24);
 
 			var ok = new Button();
 			ok.Text = "Save";
 			ok.DialogResult = DialogResult.OK;
-			ok.SetBounds(192, 82, 75, 24);
+			ok.SetBounds(214, 122, 75, 26);
 
 			var cancel = new Button();
 			cancel.Text = "Cancel";
 			cancel.DialogResult = DialogResult.Cancel;
-			cancel.SetBounds(273, 82, 75, 24);
+			cancel.SetBounds(295, 122, 75, 26);
 
 			form.Controls.Add(text);
 			form.Controls.Add(input);
