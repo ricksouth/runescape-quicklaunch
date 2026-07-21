@@ -293,9 +293,11 @@ class QuickLaunch {
 		string updated = Regex.Replace(settings,
 			"(\"lastGameAccountByGameId\"\\s*:\\s*\\{[^}]*\"" + game + "\"\\s*:\\s*)(\"[^\"]*\"|null)",
 			"$1\"" + id + "\"");
-		if (updated != settings)
-			File.WriteAllText(SettingsPath, updated, new UTF8Encoding(false));
-		return null;
+		if (updated == settings)
+			return null;
+		string error;
+		WriteSettings(settings, updated, out error);
+		return error;
 	}
 
 	static string Quote(string value) {
@@ -306,6 +308,47 @@ class QuickLaunch {
 
 	static string ReadSettings() {
 		return File.Exists(SettingsPath) ? File.ReadAllText(SettingsPath) : null;
+	}
+
+	// Backs up settings.json and writes atomically, refusing a patch that reached
+	// beyond the one value it meant to change (a reformatting launcher update could).
+	static void WriteSettings(string original, string updated, out string error) {
+		error = null;
+		if (!SingleValueEdit(original, updated)) {
+			error = "The Jagex Launcher settings aren't in the expected format, so the " +
+				"change wasn't written (to avoid corrupting them). Pick the character or " +
+				"client in the launcher itself instead.";
+			return;
+		}
+		try {
+			File.Copy(SettingsPath, SettingsPath + ".bak", true);
+			string temp = SettingsPath + ".tmp";
+			File.WriteAllText(temp, updated, new UTF8Encoding(false));
+			File.Replace(temp, SettingsPath, null);
+		}
+		catch (Exception e) {
+			error = "Couldn't update the Jagex Launcher settings: " + e.Message;
+		}
+	}
+
+	// True when nothing but one quoted value moved: structure is intact and the
+	// quotes only shifted by the pair a null-to-string edit adds.
+	static bool SingleValueEdit(string original, string updated) {
+		foreach (char c in new[] { '{', '}', '[', ']', ':', ',' }) {
+			if (CountChar(original, c) != CountChar(updated, c))
+				return false;
+		}
+		int quoteDelta = CountChar(updated, '"') - CountChar(original, '"');
+		return quoteDelta == 0 || quoteDelta == 2;
+	}
+
+	static int CountChar(string text, char c) {
+		int count = 0;
+		foreach (char ch in text) {
+			if (ch == c)
+				count++;
+		}
+		return count;
 	}
 
 	public static string FindLauncherExe() {
@@ -354,10 +397,14 @@ class QuickLaunch {
 		string updated = Regex.Replace(settings,
 			"(\"lastGameClientByGameId\"\\s*:\\s*\\{[^}]*\"" + game + "\"\\s*:\\s*)(\"[^\"]*\"|null)",
 			"$1\"" + id + "\"");
-		if (updated == settings && SelectedClientId(game) != id)
-			return "The launcher hasn't seen this game yet. Open it once and pick a client there.";
-		File.WriteAllText(SettingsPath, updated, new UTF8Encoding(false));
-		return null;
+		if (updated == settings) {
+			if (SelectedClientId(game) != id)
+				return "The launcher hasn't seen this game yet. Open it once and pick a client there.";
+			return null;
+		}
+		string error;
+		WriteSettings(settings, updated, out error);
+		return error;
 	}
 
 	public static bool AnyClientRunning() {
